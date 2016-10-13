@@ -27,13 +27,32 @@ def get_firefox_profile(data_path):
 
 class RequestForm(Firefox):
     """
-    Wrap around phantomjs through selenium, connect to the HiGal DR1
-    web query form, fill it from a given SkyCoord and search radius,
+    Manipulate firefox session through selenium, connect to the HiGal
+    DR1 web query form, fill it from a given SkyCoord and search radius,
     and save the Herschel FITS files locally.
     """
 
-    def __init__(self, url = None, skcd = None, radius = None,
-                 submit = False, local_dir = 'data/'):
+    def __init__(self, skcd = None, radius = None, submit = False,
+                 local_dir = '', url = None):
+        """
+        Parameters
+        ----------
+        skcd : astropy.coordinates.SkyCoord
+            The search center. Can be either 'fk5' or 'galactic' frame.
+        radius : astropy.units.quantity.Quantity
+            Search radius.
+        submit : bool
+            If true, send the search request to the server.
+            Basically, clicks the "Seach" button.
+        local_dir : string
+            Relative path to a folder for the output data. WIP.
+            Depending on the version combo of selenium / firefox, might not
+            make any difference - newer versions of firefox are quite strict
+            with external python modules messing up the user profile settings.
+        url : string
+            The URL of the javascript web service for DR1 data.
+            Defaults to "http://tools.asdc.asi.it/HiGAL.jsp".
+        """
         fp = get_firefox_profile(os.getcwd() + '/' + local_dir)
         super().__init__(firefox_profile=fp)
         self.band_to_idx = dict(HIGAL_BLUE=4047, HIGAL_RED=4051,
@@ -100,6 +119,9 @@ class RequestForm(Firefox):
         self.search_button.click()
 
     def get_downloader(self, band):
+        """
+        Returns a `mapDownload` web element for a given Herschel band
+        """
         idx = self.band_to_idx[band]
         hideimg_id = 'ckHideImg_{}'.format(idx)
         hide_img = self.find_element_by_id(hideimg_id)
@@ -110,6 +132,9 @@ class RequestForm(Firefox):
 
     def download_fits(self, bands = None, timeout = 60,
                       interval = 0.5, post_nap = 3):
+        """
+        Attemps to click on all Herschel image downloads
+        """
         test_id = 'mapDownload'
         try:
             log.info('Waiting for the clickable elements to show up...')
