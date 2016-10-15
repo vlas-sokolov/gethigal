@@ -9,6 +9,8 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support import expected_conditions as ec
 import astropy.units as u
 from astropy import log
+import shutil
+import glob
 import os
 
 def get_firefox_profile(data_path):
@@ -150,3 +152,64 @@ class RequestForm(Firefox):
         for band in bands:
             downloader = self.get_downloader(band)
             downloader.click()
+
+    def fix_download_loc(self, dir_in, dir_out, globber = "*.fits",
+                         lay_low = True):
+        """
+        A (hopefully) temporary workaround for the firefox profile issue.
+        Moves fits files from dir_in to dir_out.
+
+        Parameters
+        ----------
+        dir_in : string
+            Directory where firefox will save the FITS files.
+        dir_out : string
+            Destanation folder.
+        globber : string
+            A wildcard-ed expression for file selection.
+            Example: globber = "*0532p004*.fits"
+        lay_low : bool
+            If True, will delay attempts to move the files until there is
+            only one active window remaining. This should ensure that all
+            the files have started downloading. Now, as to how to make sure
+            that all the files have finished downloading, I have yet to come
+            with a good solution...
+        """
+        if lay_low:
+            self._await_only_one_window()
+
+        target_files = os.path.join(dir_in, globber)
+        for fits_file in glob.glob(target_files):
+            self._await_download_completion(fits_file)
+            shutil.move(fits_file, dir_out)
+
+    def _wait_quite_a_bit(self):
+        """ Get a reasonably [citation needed] long timeout time """
+        # we don't want to wait until hell freezes over do we now?
+        from astropy.cosmology import LambdaCDM
+        coffee_time = LambdaCDM(H0 = 70, Om0 = 0.3, Ode0 = 0.7).hubble_time
+        timeout = coffee_time.to(u.second).value
+
+        return timeout
+
+    def _await_download_completion(self, path, timeout = None):
+        """ Waits until there aren't any .part files """
+        if not os.path.exists(path + '.part'):
+            return
+        log.info('.part file found, waiting for the download to finish...')
+
+        if timeout is None:
+            timeout = self._wait_quite_a_bit()
+        download_done = lambda x: not os.path.exists(path + '.part')
+        WebDriverWait(self, timeout, 0.5).until(download_done)
+
+    def _await_only_one_window(self, prewait = 5, timeout = None):
+        """ Waits until there is only one window remaining """
+        log.info('Waiting for the all the pop-up dialogues to close...')
+        if prewait:
+            from time import sleep
+            sleep(prewait)
+        if timeout is None:
+            timeout = self._wait_quite_a_bit()
+        there_can_be_only_one = lambda x: not len(x.window_handles) > 1
+        WebDriverWait(self, timeout, 0.5).until(there_can_be_only_one)
