@@ -181,12 +181,15 @@ class RequestForm(Firefox):
         target_files = os.path.join(dir_in, globber)
         for fits_file in glob.glob(target_files):
             self._await_download_completion(fits_file)
-            shutil.move(fits_file, dir_out)
+            try:
+                shutil.move(fits_file, dir_out)
+            except shutil.Error as err:
+                log.warning(err.args[0])
 
     def _wait_quite_a_bit(self):
         """ Get a reasonably [citation needed] long timeout time """
-        # we don't want to wait until hell freezes over do we now?
         from astropy.cosmology import LambdaCDM
+        # we don't want to wait until hell freezes over do we now?
         coffee_time = LambdaCDM(H0 = 70, Om0 = 0.3, Ode0 = 0.7).hubble_time
         timeout = coffee_time.to(u.second).value
 
