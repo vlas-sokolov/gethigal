@@ -12,8 +12,10 @@ from gethigal.requestform import RequestForm
 def R2006_skycoords(irdc):
     """ Coordinates of an IRDCs in Rathborne et al. 2006 """
     irdcs = Vizier.get_catalogs("J/ApJ/641/389/table2")[0].to_pandas()
-    irdc_skcds = c.SkyCoord(irdcs._RAJ2000, irdcs._DEJ2000,
-                            unit = (u.deg, u.deg), frame = 'fk5')
+    irdcs.RAJ2000 = irdcs.RAJ2000.apply(lambda s: s.decode().replace(' ', ':'))
+    irdcs.DEJ2000 = irdcs.DEJ2000.apply(lambda s: s.decode().replace(' ', ':'))
+    irdc_skcds = c.SkyCoord(irdcs.RAJ2000, irdcs.DEJ2000,
+                            unit = (u.h, u.deg), frame = 'fk5')
 
     skcd = irdc_skcds[(irdcs.MSXDC == irdc).values][0]
     return skcd
